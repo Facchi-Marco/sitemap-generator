@@ -96,18 +96,21 @@ try_sitemap_xml() {
         # Parser le XML et extraire les URLs
         print_info "Parsing du sitemap..."
         
-        echo "SITEMAP: $domain"
-        echo "Source: $sitemap_url"
-        echo "─────────────────────────────────────────"
-        echo ""
-        
-        # Extraire les <loc> du XML
-        grep -oP '(?<=<loc>)[^<]+' "$xml_file" | while read page; do
-            # Nettoyer l'URL
-            local path=$(echo "$page" | sed "s|https\?://$domain||")
-            [ -z "$path" ] && path="/"
-            echo "  📄 $path"
-        done
+        {
+            echo "SITEMAP: $domain"
+            echo "Source: $sitemap_url"
+            echo "Date: $(date)"
+            echo "─────────────────────────────────────────"
+            echo ""
+            
+            # Extraire les <loc> du XML
+            grep -oP '(?<=<loc>)[^<]+' "$xml_file" | while read page; do
+                # Nettoyer l'URL
+                local path=$(echo "$page" | sed "s|https\?://$domain||")
+                [ -z "$path" ] && path="/"
+                echo "  📄 $path"
+            done
+        } | tee "$TEMP_DIR/result.txt"
         
         return 0
     else
@@ -181,15 +184,18 @@ crawl_site() {
     crawl_recursive "$url" 0
     
     # Afficher les résultats uniques
-    echo "SITEMAP: $domain"
-    echo "─────────────────────────────────────────"
-    echo ""
-    
-    printf '%s\n' "${found_urls[@]}" | sort -u | while read page; do
-        local path=$(echo "$page" | sed "s|https\?://$domain||")
-        [ -z "$path" ] && path="/"
-        echo "  📄 $path"
-    done
+    {
+        echo "SITEMAP: $domain"
+        echo "Date: $(date)"
+        echo "─────────────────────────────────────────"
+        echo ""
+        
+        printf '%s\n' "${found_urls[@]}" | sort -u | while read page; do
+            local path=$(echo "$page" | sed "s|https\?://$domain||")
+            [ -z "$path" ] && path="/"
+            echo "  📄 $path"
+        done
+    } | tee "$TEMP_DIR/result.txt"
 }
 
 # ============================================================================
@@ -285,13 +291,15 @@ main() {
     echo ""
     
     # Sauvegarder en fichier
-    read -p "Sauvegarder dans un fichier? (o/n): " save_choice
-    if [[ $save_choice == "o" ]] || [[ $save_choice == "O" ]]; then
-        read -p "Nom du fichier (défaut: $OUTPUT_FILE): " custom_name
-        OUTPUT_FILE=${custom_name:-$OUTPUT_FILE}
-        
-        # TODO: Sauvegarder le résultat
-        print_success "Sauvegardé dans: $OUTPUT_FILE"
+    if [ -f "$TEMP_DIR/result.txt" ]; then
+        read -p "Sauvegarder dans un fichier? (o/n): " save_choice
+        if [[ $save_choice == "o" ]] || [[ $save_choice == "O" ]]; then
+            read -p "Nom du fichier (défaut: $OUTPUT_FILE): " custom_name
+            OUTPUT_FILE=${custom_name:-$OUTPUT_FILE}
+            
+            cp "$TEMP_DIR/result.txt" "$OUTPUT_FILE"
+            print_success "Sauvegardé dans: $(pwd)/$OUTPUT_FILE"
+        fi
     fi
     
     echo ""
